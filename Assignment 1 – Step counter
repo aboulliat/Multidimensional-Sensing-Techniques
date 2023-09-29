@@ -1,0 +1,83 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import csv
+
+def visualize_data(timestamps, x_arr, y_arr, z_arr, s_arr, threshold_arr):
+    m_arr = [magnitude(x, y, z) for x, y, z in zip(x_arr, y_arr, z_arr)]
+    plt.figure(figsize=(12, 6))
+    
+    # Ajout des labels aux lignes pour les référencer dans la légende
+    plt.plot(timestamps, s_arr, color="black", linewidth=1.0, label="Step Array")
+    plt.plot(timestamps, m_arr, color="red", linewidth=1.0, label="Magnitude Array")
+    plt.plot(timestamps, threshold_arr, color="blue", linestyle="--", linewidth=1.0, label="Threshold Array")
+    
+    # Ajout de la légende dans le coin supérieur droit
+    plt.legend(loc='upper right')
+    
+    plt.show()
+
+def read_data(filename):
+    # Initializing the lists to store the data
+    timestamps, x_array, y_array, z_array = [], [], [], []
+    with open(filename, 'r') as file:
+        reader = csv.reader(file)
+        next(reader)  # Skipping the header row
+        # Reading data from the file and appending to respective lists
+        for row in reader:
+            timestamps.append(float(row[0]))
+            x_array.append(float(row[1]))
+            y_array.append(float(row[2]))
+            z_array.append(float(row[3]))
+    return timestamps, x_array, y_array, z_array  # Returning the read data
+
+def count_steps_and_threshold(timestamps, x_arr, y_arr, z_arr, window_size=5, threshold_factor=1.1):
+    rv = []  # List to store the recognized steps' timestamps
+    m_arr = [magnitude(x, y, z) for x, y, z in zip(x_arr, y_arr, z_arr)]  # Calculating magnitudes
+    # Calculating the dynamic threshold for each point
+    threshold_arr = [np.mean(m_arr[max(0, i - window_size):i+1]) * threshold_factor for i in range(len(m_arr))]
+    
+    # Recognizing the steps based on the dynamic threshold
+    for i in range(1, len(m_arr) - 1):
+        if m_arr[i - 1] < threshold_arr[i] < m_arr[i] and m_arr[i] > m_arr[i + 1]:
+            rv.append(timestamps[i])
+    return rv, threshold_arr  # Returning the recognized steps and the calculated threshold array
+
+def magnitude(x, y, z):
+    return np.linalg.norm((x, y, z))  # Calculating the magnitude of the accelerometer data
+
+def generate_step_array(timestamps, step_time):
+    s_arr = []  # Initializing the list to store step array
+    ctr = 0  # Counter for recognized steps
+    # Generating the step array based on recognized steps
+    for i, time in enumerate(timestamps):
+        if ctr < len(step_time) and step_time[ctr] <= time:
+            ctr += 1
+            s_arr.append(15)
+        else:
+            s_arr.append(0)
+    return s_arr  # Returning the generated step array
+
+def check_data(t, x, y, z):
+    # Checking if the lengths of the lists are equal
+    if len(t) != len(x) or len(y) != len(z) or len(x) != len(y):
+        print("Arrays of incorrect length")
+        return False
+    print("The amount of data read from accelerometer is " + str(len(t)) + " entries")
+    return True  # Returning True if no issue is found with the lengths of the lists
+
+def main():
+    # Reading the data from the file
+    timestamps, x_array, y_array, z_array = read_data("C:\\Users\\Amaury\\Desktop\\30run.csv")
+    # If data is not correctly read, exit the main function
+    if not check_data(timestamps, x_array, y_array, z_array):
+        return
+    # Counting the steps and calculating the threshold array
+    st, threshold_arr = count_steps_and_threshold(timestamps, x_array, y_array, z_array)
+    print("This data contains " + str(len(st)) + " steps according to the current algorithm")
+    # Generating the step array
+    s_array = generate_step_array(timestamps, st)
+    # Visualizing the data
+    visualize_data(timestamps, x_array, y_array, z_array, s_array, threshold_arr)
+
+# Running the main function
+main()
