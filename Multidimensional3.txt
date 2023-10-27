@@ -1,0 +1,78 @@
+const int sensorPins[] = {A0, A1, A2, A3}; // Pins for the 4 sensors
+const int numSensors = sizeof(sensorPins) / sizeof(sensorPins[0]);
+const int windowSize = 100; // Window size for average and variance calculation
+int readings[numSensors][windowSize]; // Store the last 100 readings for each sensor
+
+void setup() {
+  Serial.begin(9600);
+  for (int i = 0; i < numSensors; i++) {
+    for (int j = 0; j < windowSize; j++) {
+      readings[i][j] = 0;
+    }
+  }
+}
+
+void checkErroneousReadings(float globalVariance, float individualVariances[]) {
+  for (int i = 0; i < numSensors; i++) {
+    if (individualVariances[i] > globalVariance * 2) { // Threshold can be adjusted based on needs
+      Serial.print("Sensor ");
+      Serial.print(i);
+      Serial.println(" may be producing erroneous readings!");
+    }
+  }
+}
+
+void loop() {
+  float globalAverage = 0;
+  float globalVariance = 0;
+  int sensorValues[numSensors];
+  float individualVariances[numSensors];
+
+  static int index = 0;
+
+  for (int i = 0; i < numSensors; i++) {
+    sensorValues[i] = analogRead(sensorPins[i]);
+    globalAverage += sensorValues[i];
+
+    // Update the reading window for each sensor
+    readings[i][index % windowSize] = sensorValues[i];
+
+    // Calculate average and variance over the last 100 readings
+    float average = 0;
+    for (int j = 0; j < windowSize; j++) {
+      average += readings[i][j];
+    }
+    average /= windowSize;
+
+    float variance = 0;
+    for (int j = 0; j < windowSize; j++) {
+      variance += pow(readings[i][j] - average, 2);
+    }
+    variance /= windowSize;
+    individualVariances[i] = variance;
+
+    Serial.print("Sensor ");
+    Serial.print(i);
+    Serial.print(" - Value: ");
+    Serial.print(sensorValues[i]);
+    Serial.print(" Average: ");
+    Serial.print(average);
+    Serial.print(" Variance: ");
+    Serial.println(variance);
+
+    globalVariance += variance;
+  }
+
+  globalAverage /= numSensors;
+  globalVariance /= numSensors;
+
+  checkErroneousReadings(globalVariance, individualVariances); // Check for erroneous readings
+
+  Serial.print("Global Average: ");
+  Serial.print(globalAverage);
+  Serial.print(" Global Variance: ");
+  Serial.println(globalVariance);
+
+  index++;
+  delay(1000);
+}
